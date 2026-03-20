@@ -5,13 +5,17 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+CONFIG_DIR = Path.home() / ".config" / "scour"
+ENV_FILE = CONFIG_DIR / ".env"
+RESULTS_DIR = Path.home() / ".local" / "share" / "scour" / "results"
+
+load_dotenv(ENV_FILE)
 
 
 def get_env(key: str) -> str:
     val = os.getenv(key)
     if not val:
-        raise RuntimeError(f"Missing environment variable: {key}")
+        raise RuntimeError(f"Missing environment variable: {key} — edit {ENV_FILE}")
     return val
 
 
@@ -23,9 +27,8 @@ def slugify(text: str) -> str:
 
 
 def results_dir() -> Path:
-    path = Path("results")
-    path.mkdir(exist_ok=True)
-    return path
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    return RESULTS_DIR
 
 
 def save_report(query: str, markdown: str) -> str:

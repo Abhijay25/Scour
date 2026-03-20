@@ -38,6 +38,8 @@ class ScourApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._previous_view: str = "welcome"
+        self._command_history: list[str] = []
+        self._history_cursor: int = -1
 
     def compose(self) -> ComposeResult:
         with ContentSwitcher(initial="welcome", id="main-content"):
@@ -46,7 +48,7 @@ class ScourApp(App):
             yield ResultsView(id="results")
             yield HistoryView(id="history")
             yield ReportPreview(id="preview")
-        yield Input(placeholder='/search "query" | /history | /help | /clear', id="command-bar")
+        yield Input(placeholder='/search "query" | /history | /help | /clear | /quit', id="command-bar")
 
     def on_mount(self) -> None:
         self.query_one("#command-bar", Input).focus()
@@ -59,6 +61,9 @@ class ScourApp(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         raw = event.value.strip()
+        if raw:
+            self._command_history.append(raw)
+            self._history_cursor = -1
         event.input.clear()
         if not raw:
             return
@@ -80,15 +85,36 @@ class ScourApp(App):
         elif raw == "/clear":
             self._switch_to("welcome")
 
+        elif raw in ("/quit", "/exit"):
+            self.exit()
+
         else:
             self.notify(f"Unknown command: {raw}", severity="warning")
 
     def on_key(self, event) -> None:
-        if event.key == "escape":
+        input_widget = self.query_one("#command-bar", Input)
+        if event.key == "up" and self._command_history:
+            if self._history_cursor == -1:
+                self._history_cursor = len(self._command_history) - 1
+            elif self._history_cursor > 0:
+                self._history_cursor -= 1
+            input_widget.value = self._command_history[self._history_cursor]
+            input_widget.cursor_position = len(input_widget.value)
+            event.prevent_default()
+        elif event.key == "down" and self._history_cursor != -1:
+            if self._history_cursor < len(self._command_history) - 1:
+                self._history_cursor += 1
+                input_widget.value = self._command_history[self._history_cursor]
+            else:
+                self._history_cursor = -1
+                input_widget.value = ""
+            input_widget.cursor_position = len(input_widget.value)
+            event.prevent_default()
+        elif event.key == "escape":
             current = self.query_one("#main-content", ContentSwitcher).current
             if current in ("preview", "history"):
                 self._switch_to(self._previous_view if self._previous_view != current else "welcome")
-            self.query_one("#command-bar", Input).focus()
+            input_widget.focus()
 
     def on_report_selected(self, event: ReportSelected) -> None:
         self._switch_to("preview")

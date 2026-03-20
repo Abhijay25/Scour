@@ -14,7 +14,7 @@ async def run_search(query: str, on_status: Callable[[str], None]) -> FullReport
 
     urls = [r.url for r in ranked]
     on_status(f"Extracting content from {len(urls)} sites...")
-    extracted = await tinyfish.extract_urls(urls)
+    extracted = await tinyfish.extract_urls(urls, query)
 
     successful = sum(1 for e in extracted if e.success)
     on_status(f"Analyzing {successful} pages with Gemini...")

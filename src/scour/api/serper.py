@@ -22,7 +22,12 @@ async def search(query: str, num: int = 10) -> list[SearchResult]:
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPStatusError as e:
-        raise PipelineError("search", f"HTTP {e.response.status_code}: {e.response.text}")
+        status = e.response.status_code
+        if status in (401, 403):
+            raise PipelineError("search", f"Serper API key invalid or unauthorized (HTTP {status}) — check SERPER_API_KEY in ~/.config/scour/.env")
+        if status == 429:
+            raise PipelineError("search", "Serper rate limit exceeded — check your plan at serper.dev")
+        raise PipelineError("search", f"Serper HTTP {status}: {e.response.text[:200]}")
     except httpx.RequestError as e:
         raise PipelineError("search", f"Request failed: {e}")
 

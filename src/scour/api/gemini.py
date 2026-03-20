@@ -12,13 +12,33 @@ from scour.models import (
 )
 from scour.utils import get_env
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 MAX_WORDS_PER_PAGE = 5000
 
 
 def _truncate(text: str, max_words: int = MAX_WORDS_PER_PAGE) -> str:
     words = text.split()
     return " ".join(words[:max_words])
+
+
+def _build_markdown(query: str, analyses: list[CompetitorAnalysis]) -> str:
+    lines = [f"# Competitive Analysis: {query}\n"]
+    for a in analyses:
+        lines.append(f"## {a.title}\n")
+        lines.append(f"**URL:** {a.url}\n")
+        if a.summary:
+            lines.append(f"{a.summary}\n")
+        if a.strengths:
+            lines.append("**Strengths:**")
+            for s in a.strengths:
+                lines.append(f"- {s}")
+            lines.append("")
+        if a.weaknesses:
+            lines.append("**Weaknesses:**")
+            for w in a.weaknesses:
+                lines.append(f"- {w}")
+            lines.append("")
+    return "\n".join(lines)
 
 
 async def _call_gemini(api_key: str, prompt: str) -> str:
@@ -36,7 +56,16 @@ async def _call_gemini(api_key: str, prompt: str) -> str:
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPStatusError as e:
-        raise PipelineError("gemini", f"HTTP {e.response.status_code}: {e.response.text}")
+        status = e.response.status_code
+        try:
+            msg = e.response.json().get("error", {}).get("message", "").split("\n")[0]
+        except Exception:
+            msg = e.response.text[:200]
+        if status in (401, 403):
+            raise PipelineError("gemini", f"Gemini API key invalid or unauthorized (HTTP {status}) — check GEMINI_API_KEY in ~/.config/scour/.env")
+        if status == 429:
+            raise PipelineError("gemini", "Gemini quota exhausted — free-tier limit reached. Wait or enable billing at aistudio.google.com.")
+        raise PipelineError("gemini", f"HTTP {status}: {msg}")
     except httpx.RequestError as e:
         raise PipelineError("gemini", f"Request failed: {e}")
 
@@ -57,7 +86,7 @@ async def rank_results(query: str, results: list[SearchResult]) -> list[RankedRe
         for i, r in enumerate(results)
     )
 
-    prompt = f"""You are helping a developer find inspiration and competitive analysis for: "{query}"
+    prompt = f"""You are helping with competitive research for: "{query}"
 
 Here are search results:
 {results_text}
@@ -103,7 +132,9 @@ async def analyze_content(query: str, extracted: list[ExtractedContent]) -> Full
 
     successful = [e for e in extracted if e.success and e.text]
     if not successful:
-        raise PipelineError("analyze", "No content could be extracted from any URL")
+        errors = list({e.error for e in extracted if e.error})
+        detail = "; ".join(errors[:3]) if errors else "unknown error"
+        raise PipelineError("extract", f"No content could be extracted — {detail}")
 
     pages_text = ""
     for i, page in enumerate(successful):
@@ -126,11 +157,10 @@ Return JSON in this exact format:
       "weaknesses": ["weakness 1", "weakness 2"],
       "summary": "2-3 sentence overview of this tool/site"
     }}
-  ],
-  "markdown": "# Competitive Analysis: {query}\\n\\n[full markdown report with sections for each site, including strengths, weaknesses, and a final comparison table]"
+  ]
 }}
 
-Be specific and actionable. Focus on features, UX, pricing model, target audience, and unique value propositions."""
+Be specific and actionable. Always consider target audience and unique value propositions. Beyond that, determine what other aspects are most relevant based on the user's research query — adapt your analysis to their intent."""
 
     raw = await _call_gemini(api_key, prompt)
 
@@ -146,7 +176,7 @@ Be specific and actionable. Focus on features, UX, pricing model, target audienc
             )
             for item in data.get("analyses", [])
         ]
-        markdown = data.get("markdown", "")
+        markdown = _build_markdown(query, analyses)
         return FullReport(query=query, analyses=analyses, markdown=markdown)
     except (json.JSONDecodeError, KeyError) as e:
         raise PipelineError("analyze", f"Failed to parse Gemini response: {e}")
