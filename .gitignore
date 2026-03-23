@@ -9,3 +9,4 @@ build/
 results/
 .envrc
 .direnv/
+flake.nix
