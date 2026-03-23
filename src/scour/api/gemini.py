@@ -148,21 +148,21 @@ async def rank_results(query: str, results: list[SearchResult], *, has_urls: boo
 
     prompt = f"""You are helping with competitive research for: "{query}"
 
-This tool is for BUSINESS competitive analysis — finding the ACTUAL COMPANIES, startups, products, and services in a market. The user wants to visit each competitor's own website directly.
+This tool is for BUSINESS competitive analysis — finding companies, startups, products, and services in a market.
 
-CRITICAL RULES:
-1. ONLY return URLs that are a company/startup/product's OWN website (e.g. notion.so, linear.app, airtable.com). These are direct homepages, pricing pages, or product pages belonging to the company itself.
-2. NEVER return listicle or aggregator pages — this includes sites like G2, Capterra, TechCrunch roundups, "Top 10 X tools" blog posts, ProductHunt collection pages, Crunchbase lists, Medium articles, or any page that lists/reviews multiple products. The user wants to research each competitor directly, not read someone else's summary.
-3. Prioritize early-stage startups, small companies, and indie products. Large enterprises are fine but should not crowd out smaller players.
+RANKING PRIORITIES (in order):
+1. BEST: Direct company/startup/product homepages (e.g. notion.so, linear.app, mesclabs.com). Always prefer these.
+2. ACCEPTABLE: Company profile pages on Crunchbase, LinkedIn, AngelList, or news articles profiling a SINGLE specific company — but only if they name and link to the company.
+3. AVOID: Generic listicles ("Top 10 X tools"), G2/Capterra category pages, Wikipedia, academic papers, and aggregator roundups. Only include these as a last resort if no direct company sites are available.
+
+Prioritize early-stage startups, small companies, and indie products. Large enterprises are fine but should not crowd out smaller players.
 {business_hint}
 Here are search results:
 {results_text}
 
-Pick up to {top_n} results — each MUST be a direct link to a company/product's own website. For each, explain why it's a relevant competitor.
+Pick up to {top_n} results most useful for competitive research. Strongly prefer direct company websites. For each, explain why it's relevant as a business competitor.
 
-Exclude: listicles, aggregator sites (G2, Capterra, AlternativeTo, etc.), academic journals, Wikipedia, news roundups, blog posts listing multiple tools, and any URL that is NOT the company's own domain.
-
-Only include results that are genuinely relevant — never pad with weak matches. Return at least 2 results if possible.
+You MUST return at least 2 results — if no perfect matches exist, include the best available options. An imperfect result is better than no results.
 
 Return JSON in this exact format:
 {{
@@ -204,7 +204,13 @@ async def analyze_content(query: str, extracted: list[ExtractedContent]) -> Full
     successful = [e for e in extracted if e.success and e.text]
     if not successful:
         errors = list({e.error for e in extracted if e.error})
-        detail = "; ".join(errors[:3]) if errors else "unknown error"
+        failed_urls = [e.url for e in extracted if not e.success]
+        if errors:
+            detail = "; ".join(errors[:3])
+        elif failed_urls:
+            detail = f"all {len(failed_urls)} sites failed to respond"
+        else:
+            detail = "no extractable content found"
         raise PipelineError("extract", f"No content could be extracted — {detail}")
 
     pages_text = ""

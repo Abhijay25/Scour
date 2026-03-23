@@ -9,7 +9,7 @@ from scour.utils import get_env
 
 TINYFISH_URL = "https://agent.tinyfish.ai/v1/automation/run-sse"
 SEMAPHORE_LIMIT = 3
-TIMEOUT = 45
+TIMEOUT = 60
 
 
 async def _extract_one(
@@ -62,7 +62,8 @@ async def _extract_one(
         except Exception as e:
             if on_url_status:
                 on_url_status(url, False)
-            return ExtractedContent(url=url, title="", text="", success=False, error=str(e))
+            err = str(e) or f"{type(e).__name__} (no details)"
+            return ExtractedContent(url=url, title="", text="", success=False, error=err)
 
 
 async def extract_urls(

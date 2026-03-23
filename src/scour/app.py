@@ -1,3 +1,4 @@
+import asyncio
 import subprocess
 import sys
 
@@ -6,7 +7,7 @@ from textual.widgets import ContentSwitcher, Input
 
 from scour.models import PipelineError
 from scour.pipeline import run_search
-from scour.utils import results_dir
+from scour.utils import list_reports, parse_report_meta, results_dir
 from scour.widgets.history import HistoryView, ReportSelected
 from scour.widgets.loading import LoadingView
 from scour.widgets.report_preview import ReportPreview
@@ -58,6 +59,21 @@ class ScourApp(App):
 
     def on_mount(self) -> None:
         self.query_one("#command-bar", Input).focus()
+
+    def _get_rerun_query(self) -> str:
+        """Get query for /rerun: preview > current results > latest history."""
+        preview = self.query_one(ReportPreview)
+        if preview.current_query:
+            return preview.current_query
+        report = self.query_one(ResultsView)._report
+        if report and report.query:
+            return report.query
+        reports = list_reports()
+        if reports:
+            _, query = parse_report_meta(reports[0])
+            if query:
+                return query
+        return ""
 
     def _switch_to(self, view_id: str) -> None:
         switcher = self.query_one("#main-content", ContentSwitcher)
@@ -114,11 +130,11 @@ class ScourApp(App):
             self.query_one("#main-content", ContentSwitcher).current = "welcome"
 
         elif raw == "/rerun":
-            preview = self.query_one(ReportPreview)
-            if preview.current_query:
-                self._do_search(preview.current_query)
+            query = self._get_rerun_query()
+            if query:
+                self._do_search(query)
             else:
-                self.notify("No report loaded to re-run", severity="warning")
+                self.notify("No report to re-run — run /search first", severity="warning")
 
         elif raw == "/delete":
             current = self.query_one("#main-content", ContentSwitcher).current
@@ -181,6 +197,10 @@ class ScourApp(App):
                 self._nav_stack.append("welcome")
                 self.query_one("#main-content", ContentSwitcher).current = "results"
             input_widget.focus()
+        elif event.key == "c":
+            current = self.query_one("#main-content", ContentSwitcher).current
+            if current in ("preview", "results") and not input_widget.has_focus:
+                self._copy_report()
         elif event.key == "d":
             current = self.query_one("#main-content", ContentSwitcher).current
             if current == "history" and not input_widget.has_focus:
@@ -191,20 +211,19 @@ class ScourApp(App):
         self.query_one(ReportPreview).show_report(event.path)
 
     def _copy_report(self) -> None:
-        results_view = self.query_one(ResultsView)
-        report = results_view._report
-        if not report or not report.markdown:
+        markdown = ""
+        current = self.query_one("#main-content", ContentSwitcher).current
+        if current == "preview":
+            markdown = self.query_one(ReportPreview).current_markdown
+        else:
+            report = self.query_one(ResultsView)._report
+            if report:
+                markdown = report.markdown
+        if not markdown:
             self.notify("No report to copy — run /search first", severity="warning")
             return
-        try:
-            if sys.platform == "darwin":
-                proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
-            else:
-                proc = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE)
-            proc.communicate(report.markdown.encode())
-            self.notify("Report copied to clipboard", severity="information")
-        except FileNotFoundError:
-            self.notify(f"Report saved at: {report.saved_path}", severity="information")
+        self.copy_to_clipboard(markdown)
+        self.notify("Report copied to clipboard", severity="information")
 
     def _open_results_dir(self) -> None:
         path = str(results_dir())
@@ -247,6 +266,9 @@ class ScourApp(App):
                 results_view.show_report(report)
                 self._switch_to("results")
                 self.notify(f"Report saved to {report.saved_path}", severity="information")
+            except asyncio.CancelledError:
+                loading.stop_timer()
+                return  # silently stop — a new search replaced us
             except PipelineError as e:
                 loading.stop_timer()
                 self._switch_to("welcome")

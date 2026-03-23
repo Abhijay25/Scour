@@ -32,9 +32,10 @@ class ReportPreview(Widget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.current_query: str = ""
+        self.current_markdown: str = ""
 
     def compose(self) -> ComposeResult:
-        yield Label("Escape to go back  |  /rerun to search again", id="preview-hint")
+        yield Label("Escape to go back  |  c to copy  |  /rerun to search again", id="preview-hint")
         with VerticalScroll(id="preview-scroll"):
             yield Markdown("", id="markdown-content")
 
@@ -43,6 +44,7 @@ class ReportPreview(Widget):
             content = path.read_text(encoding="utf-8")
         except Exception as e:
             content = f"# Error\n\nCould not read file: {e}"
+        self.current_markdown = content
         # Parse query from markdown heading
         match = re.search(r'^# Competitive Analysis:\s*(.+)', content, re.MULTILINE)
         self.current_query = match.group(1).strip() if match else ""

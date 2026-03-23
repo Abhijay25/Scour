@@ -12,13 +12,15 @@ async def run_search(query: str, on_status: Callable[[str], None], *, top_n: int
     # Extract URLs from query and build a cleaner search query
     urls_in_query = _URL_PATTERN.findall(query)
     search_query = _URL_PATTERN.sub('', query).strip()
-    search_query = f"{search_query} startup company product site"
-
     on_status("Searching the web...")
-    results = await serper.search(search_query, num=20)
+    results = await serper.search(search_query, num=15)
 
     on_status(f"Ranking {len(results)} results...")
     ranked = await gemini.rank_results(query, results, has_urls=bool(urls_in_query), top_n=top_n)
+    ranked = ranked[:top_n]  # hard cap in case LLM returns more
+
+    if not ranked and not urls_in_query:
+        raise PipelineError("rank", "No relevant competitor sites found — try a more specific query or include a company URL")
 
     # Add any URLs from the original query as guaranteed extraction targets
     ranked_urls = {r.url for r in ranked}
