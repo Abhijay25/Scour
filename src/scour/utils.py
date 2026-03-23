@@ -32,7 +32,7 @@ def results_dir() -> Path:
 
 
 def save_report(query: str, markdown: str) -> str:
-    date_str = datetime.now().strftime("%Y-%m-%d")
+    date_str = datetime.now().strftime("%Y-%m-%d-%H%M")
     slug = slugify(query)
     filename = f"{date_str}-{slug}.md"
     path = results_dir() / filename
@@ -41,4 +41,23 @@ def save_report(query: str, markdown: str) -> str:
 
 
 def list_reports() -> list[Path]:
-    return sorted(results_dir().glob("*.md"), reverse=True)
+    return sorted(results_dir().glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def parse_report_meta(path: Path) -> tuple[str, str]:
+    """Extract (date_label, query) from a report file."""
+    # Date from filename: 2026-03-20-1758-slug.md -> 2026-03-20
+    name = path.stem
+    date_label = name[:10] if len(name) >= 10 else ""
+    # Query from first heading line
+    query = ""
+    try:
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("# Competitive Analysis:"):
+                    query = line.split(":", 1)[1].strip()
+                    break
+    except Exception:
+        pass
+    return date_label, query

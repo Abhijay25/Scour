@@ -34,9 +34,17 @@ class CompetitorAnalysis:
 
 
 @dataclass
+class CompetitiveEdge:
+    ideas_to_steal: list[str] = field(default_factory=list)
+    pitfalls_to_avoid: list[str] = field(default_factory=list)
+    gaps: list[str] = field(default_factory=list)
+
+
+@dataclass
 class FullReport:
     query: str
     analyses: list[CompetitorAnalysis] = field(default_factory=list)
+    edge: CompetitiveEdge | None = None
     markdown: str = ""
     saved_path: str = ""
 

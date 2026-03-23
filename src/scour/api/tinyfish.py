@@ -1,5 +1,6 @@
 import asyncio
 import json
+from collections.abc import Callable
 
 import httpx
 
@@ -7,12 +8,13 @@ from scour.models import ExtractedContent, PipelineError
 from scour.utils import get_env
 
 TINYFISH_URL = "https://agent.tinyfish.ai/v1/automation/run-sse"
-SEMAPHORE_LIMIT = 2
-TIMEOUT = 90
+SEMAPHORE_LIMIT = 3
+TIMEOUT = 45
 
 
 async def _extract_one(
-    client: httpx.AsyncClient, sem: asyncio.Semaphore, url: str, goal: str
+    client: httpx.AsyncClient, sem: asyncio.Semaphore, url: str, goal: str,
+    on_url_status: "Callable | None" = None,
 ) -> ExtractedContent:
     async with sem:
         try:
@@ -36,24 +38,36 @@ async def _extract_one(
                         break
 
             if result is None:
-                return ExtractedContent(
+                content = ExtractedContent(
                     url=url, title="", text="", success=False, error="No COMPLETE event received"
                 )
-            if not isinstance(result, str):
-                result = json.dumps(result)
-            return ExtractedContent(url=url, title="", text=result, success=True)
+            elif not isinstance(result, str):
+                content = ExtractedContent(url=url, title="", text=json.dumps(result), success=True)
+            else:
+                content = ExtractedContent(url=url, title="", text=result, success=True)
+            if on_url_status:
+                on_url_status(url, content.success)
+            return content
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             if status in (401, 403):
-                return ExtractedContent(url=url, title="", text="", success=False, error=f"Tinyfish API key invalid (HTTP {status})")
-            if status == 429:
-                return ExtractedContent(url=url, title="", text="", success=False, error="Tinyfish rate limit exceeded")
-            return ExtractedContent(url=url, title="", text="", success=False, error=f"HTTP {status}")
+                content = ExtractedContent(url=url, title="", text="", success=False, error=f"Tinyfish API key invalid (HTTP {status})")
+            elif status == 429:
+                content = ExtractedContent(url=url, title="", text="", success=False, error="Tinyfish rate limit exceeded")
+            else:
+                content = ExtractedContent(url=url, title="", text="", success=False, error=f"HTTP {status}")
+            if on_url_status:
+                on_url_status(url, False)
+            return content
         except Exception as e:
+            if on_url_status:
+                on_url_status(url, False)
             return ExtractedContent(url=url, title="", text="", success=False, error=str(e))
 
 
-async def extract_urls(urls: list[str], query: str) -> list[ExtractedContent]:
+async def extract_urls(
+    urls: list[str], query: str, on_url_status: Callable | None = None,
+) -> list[ExtractedContent]:
     try:
         api_key = get_env("TINYFISH_API_KEY")
     except RuntimeError as e:
@@ -70,5 +84,5 @@ async def extract_urls(urls: list[str], query: str) -> list[ExtractedContent]:
         headers={"X-API-Key": api_key},
         timeout=TIMEOUT,
     ) as client:
-        tasks = [_extract_one(client, sem, url, goal) for url in urls]
+        tasks = [_extract_one(client, sem, url, goal, on_url_status) for url in urls]
         return await asyncio.gather(*tasks)
