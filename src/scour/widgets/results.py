@@ -6,6 +6,30 @@ from textual.widgets import Static
 from scour.models import CompetitiveEdge, FullReport
 
 
+class BottomLineBlock(Widget):
+    DEFAULT_CSS = """
+    BottomLineBlock {
+        border: round $accent;
+        padding: 1 2;
+        margin-bottom: 1;
+        height: auto;
+        width: 100%;
+    }
+    """
+
+    def __init__(self, bottom_line: str, positioning: str, **kwargs):
+        super().__init__(**kwargs)
+        self.bottom_line = bottom_line
+        self.positioning = positioning
+
+    def compose(self) -> ComposeResult:
+        lines = ["[bold $accent]Bottom Line[/bold $accent]\n"]
+        lines.append(self.bottom_line)
+        if self.positioning:
+            lines.append(f"\n[italic]{self.positioning}[/italic]")
+        yield Static("\n".join(lines), markup=True)
+
+
 class CompetitiveEdgeBlock(Widget):
     DEFAULT_CSS = """
     CompetitiveEdgeBlock {
@@ -118,10 +142,38 @@ class ResultsView(Widget):
             block.remove()
         for block in scroll.query(CompetitiveEdgeBlock):
             block.remove()
+        for block in scroll.query(BottomLineBlock):
+            block.remove()
+        for block in scroll.query(".dig-deeper"):
+            block.remove()
+        for block in scroll.query(".niche-easter-egg"):
+            block.remove()
         saved = scroll.query_one("#saved-path", Static)
+        if report.bottom_line:
+            scroll.mount(BottomLineBlock(report.bottom_line, report.positioning), before=saved)
         if report.edge:
             scroll.mount(CompetitiveEdgeBlock(report.edge), before=saved)
         for analysis in report.analyses:
             scroll.mount(CompetitorBlock(analysis), before=saved)
+        if len(report.analyses) <= 2:
+            niche_msg = Static(
+                "[italic dim]Looks like you're in a niche market — the field is wide open. Take control![/italic dim]",
+                markup=True,
+                classes="niche-easter-egg",
+            )
+            niche_msg.styles.padding = (1, 2)
+            niche_msg.styles.margin = (0, 0, 1, 0)
+            niche_msg.styles.width = "100%"
+            scroll.mount(niche_msg, before=saved)
+        if report.suggested_queries:
+            lines = ["[bold $accent]Dig Deeper[/bold $accent]\n"]
+            for sq in report.suggested_queries:
+                lines.append(f"  [cyan]/search {sq}[/cyan]")
+            dig_deeper = Static("\n".join(lines), markup=True, classes="dig-deeper")
+            dig_deeper.styles.border = ("round", "$panel")
+            dig_deeper.styles.padding = (1, 2)
+            dig_deeper.styles.margin = (0, 0, 1, 0)
+            dig_deeper.styles.width = "100%"
+            scroll.mount(dig_deeper, before=saved)
         if report.saved_path:
             saved.update(f"Report saved to {report.saved_path}")

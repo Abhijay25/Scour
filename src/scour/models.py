@@ -45,6 +45,9 @@ class FullReport:
     query: str
     analyses: list[CompetitorAnalysis] = field(default_factory=list)
     edge: CompetitiveEdge | None = None
+    suggested_queries: list[str] = field(default_factory=list)
+    bottom_line: str = ""
+    positioning: str = ""
     markdown: str = ""
     saved_path: str = ""
 

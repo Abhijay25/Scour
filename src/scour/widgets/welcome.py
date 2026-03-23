@@ -15,7 +15,8 @@ WELCOME_TEXT = (
     "\n"
     "[dim]Get started:[/dim]\n"
     "  [cyan]/search[/cyan] [yellow]<query>[/yellow]    — research a market or find competitors\n"
-    "  [cyan]/help[/cyan]               — show all commands and tips\n"
+    "  [cyan]/tips[/cyan]               — learn how to write better queries\n"
+    "  [cyan]/help[/cyan]               — show all commands\n"
     "  [cyan]/quit[/cyan]               — exit Scour\n"
     "\n"
     "[dim]Example:[/dim]\n"
@@ -30,6 +31,13 @@ HELP_TEXT = (
     "    Quotes are optional — just type naturally. The analysis adapts to your intent:\n"
     "    ask about UX and get UX insights, ask about pricing and get pricing comparisons.\n"
     "    You can include URLs: [cyan]/search stem cells similar to https://example.com[/cyan]\n"
+    "\n"
+    "  [cyan]/search -n[/cyan] [yellow]<count>[/yellow] [yellow]<query>[/yellow]\n"
+    "    Control the number of results (2–15, default 5).\n"
+    "    Example: [cyan]/search -n 8 fintech apps in Southeast Asia[/cyan]\n"
+    "\n"
+    "  [cyan]/tips[/cyan]\n"
+    "    Show tips for writing better, more specific queries.\n"
     "\n"
     "  [cyan]/history[/cyan]\n"
     "    Browse all past reports saved on your machine. Select one to read it.\n"
@@ -60,11 +68,13 @@ HELP_TEXT = (
     "\n"
     "  [cyan]Up / Down[/cyan]    Cycle through previous commands\n"
     "  [cyan]Escape[/cyan]       Go back to the previous screen\n"
+    "  [cyan]Shift+Tab[/cyan]    Jump to the latest results\n"
     "  [cyan]d[/cyan]            Delete selected report (in history view)\n"
     "\n"
     "[bold]Examples[/bold]\n"
     "\n"
     "  [cyan]/search best project management tools for developers[/cyan]\n"
+    "  [cyan]/search -n 3 CRM tools for small teams[/cyan]\n"
     "  [cyan]/search competitor analysis for CRM platforms[/cyan]\n"
     "  [cyan]/search UX patterns in B2B SaaS onboarding flows[/cyan]\n"
 )
@@ -107,6 +117,52 @@ class WelcomeView(Widget):
                     yield Static(WELCOME_TEXT, id="welcome")
 
 
+TIPS_TEXT = (
+    "[bold]Writing Better Queries[/bold]\n"
+    "\n"
+    "Scour works best when you describe what you're looking for naturally.\n"
+    "Adding specifics helps the AI narrow down the most relevant competitors.\n"
+    "\n"
+    "[bold]Company type[/bold]\n"
+    "\n"
+    "  [cyan]/search AI writing assistants — startups only[/cyan]\n"
+    "  [cyan]/search SME accounting software[/cyan]\n"
+    "  [cyan]/search enterprise observability platforms[/cyan]\n"
+    "\n"
+    "[bold]Region[/bold]\n"
+    "\n"
+    "  [cyan]/search fintech apps in Southeast Asia[/cyan]\n"
+    "  [cyan]/search food delivery startups in Latin America[/cyan]\n"
+    "  [cyan]/search European alternatives to Notion[/cyan]\n"
+    "\n"
+    "[bold]Ownership & structure[/bold]\n"
+    "\n"
+    "  [cyan]/search open source project management tools[/cyan]\n"
+    "  [cyan]/search bootstrapped CRM platforms[/cyan]\n"
+    "  [cyan]/search VC-funded edtech startups[/cyan]\n"
+    "  [cyan]/search publicly traded cybersecurity companies[/cyan]\n"
+    "\n"
+    "[bold]Other modifiers[/bold]\n"
+    "\n"
+    "  [cyan]/search B2B SaaS onboarding tools[/cyan]\n"
+    "  [cyan]/search B2C fitness apps with subscription pricing[/cyan]\n"
+    "  [cyan]/search developer tools with usage-based pricing[/cyan]\n"
+    "  [cyan]/search healthcare AI — diagnostics vertical[/cyan]\n"
+    "\n"
+    "[bold]Combining modifiers[/bold]\n"
+    "\n"
+    "  Stack qualifiers to get very specific results:\n"
+    "  [cyan]/search bootstrapped B2B SaaS for HR in Europe[/cyan]\n"
+    "  [cyan]/search VC-funded developer tools with freemium model — early stage[/cyan]\n"
+    "  [cyan]/search -n 8 open source analytics platforms competing with Mixpanel[/cyan]\n"
+    "\n"
+    "[dim]These aren't filters — just write naturally and the AI adapts.\n"
+    "The more context you give, the more targeted your results will be.[/dim]\n"
+    + ("\n" * 30)
+    + "[dim]...psst. try /doom[/dim]\n"
+)
+
+
 class HelpView(Widget):
     DEFAULT_CSS = """
     HelpView {
@@ -129,3 +185,27 @@ class HelpView(Widget):
     def compose(self) -> ComposeResult:
         with VerticalScroll():
             yield Static(HELP_TEXT, id="help")
+
+
+class TipsView(Widget):
+    DEFAULT_CSS = """
+    TipsView {
+        width: 100%;
+        height: 100%;
+        align: center middle;
+    }
+    TipsView VerticalScroll {
+        width: 96;
+        height: 100%;
+        border: round $panel;
+        padding: 1 3;
+    }
+    TipsView #tips {
+        text-align: left;
+        width: 100%;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll():
+            yield Static(TIPS_TEXT, id="tips")

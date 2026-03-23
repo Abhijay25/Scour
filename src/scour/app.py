@@ -11,7 +11,7 @@ from scour.widgets.history import HistoryView, ReportSelected
 from scour.widgets.loading import LoadingView
 from scour.widgets.report_preview import ReportPreview
 from scour.widgets.results import ResultsView
-from scour.widgets.welcome import HelpView, WelcomeView
+from scour.widgets.welcome import HelpView, TipsView, WelcomeView
 
 
 class ScourApp(App):
@@ -41,7 +41,7 @@ class ScourApp(App):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._previous_view: str = "welcome"
+        self._nav_stack: list[str] = []
         self._command_history: list[str] = []
         self._history_cursor: int = -1
 
@@ -49,20 +49,22 @@ class ScourApp(App):
         with ContentSwitcher(initial="welcome", id="main-content"):
             yield WelcomeView(id="welcome")
             yield HelpView(id="help")
+            yield TipsView(id="tips")
             yield LoadingView(id="loading")
             yield ResultsView(id="results")
             yield HistoryView(id="history")
             yield ReportPreview(id="preview")
-        yield Input(placeholder='/search "query" | /history | /help | /clear | /quit', id="command-bar")
+        yield Input(placeholder='/search "query" | /history | /tips | /help | /quit', id="command-bar")
 
     def on_mount(self) -> None:
         self.query_one("#command-bar", Input).focus()
 
     def _switch_to(self, view_id: str) -> None:
-        current = self.query_one("#main-content", ContentSwitcher).current
+        switcher = self.query_one("#main-content", ContentSwitcher)
+        current = switcher.current
         if current != view_id:
-            self._previous_view = current
-        self.query_one("#main-content", ContentSwitcher).current = view_id
+            self._nav_stack.append(current)
+        switcher.current = view_id
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         raw = event.value.strip()
@@ -74,9 +76,19 @@ class ScourApp(App):
             return
 
         if raw.startswith("/search "):
-            query = raw[8:].strip().strip('"').strip("'")
+            rest = raw[8:].strip()
+            top_n = 5
+            if rest.startswith("-n "):
+                parts = rest.split(None, 2)
+                if len(parts) >= 2 and parts[1].isdigit():
+                    top_n = max(2, min(15, int(parts[1])))
+                    rest = parts[2] if len(parts) > 2 else ""
+                else:
+                    self.notify('Usage: /search -n 5 "your query"', severity="warning")
+                    return
+            query = rest.strip('"').strip("'")
             if query:
-                self._do_search(query)
+                self._do_search(query, top_n=top_n)
             else:
                 self.notify('Usage: /search "your query"', severity="warning")
 
@@ -87,8 +99,12 @@ class ScourApp(App):
         elif raw == "/help":
             self._switch_to("help")
 
+        elif raw == "/tips":
+            self._switch_to("tips")
+
         elif raw == "/clear":
-            self._switch_to("welcome")
+            self._nav_stack.clear()
+            self.query_one("#main-content", ContentSwitcher).current = "welcome"
 
         elif raw == "/rerun":
             preview = self.query_one(ReportPreview)
@@ -109,6 +125,9 @@ class ScourApp(App):
 
         elif raw == "/open":
             self._open_results_dir()
+
+        elif raw == "/doom":
+            self._launch_doom()
 
         elif raw in ("/quit", "/exit"):
             self.exit()
@@ -137,8 +156,19 @@ class ScourApp(App):
             event.prevent_default()
         elif event.key == "escape":
             current = self.query_one("#main-content", ContentSwitcher).current
-            if current in ("preview", "history", "help"):
-                self._switch_to(self._previous_view if self._previous_view != current else "welcome")
+            if current in ("preview", "history", "help", "tips"):
+                if self._nav_stack:
+                    target = self._nav_stack.pop()
+                else:
+                    target = "welcome"
+                self.query_one("#main-content", ContentSwitcher).current = target
+            input_widget.focus()
+        elif event.key == "shift+tab":
+            current = self.query_one("#main-content", ContentSwitcher).current
+            if current != "results":
+                self._nav_stack.clear()
+                self._nav_stack.append("welcome")
+                self.query_one("#main-content", ContentSwitcher).current = "results"
             input_widget.focus()
         elif event.key == "d":
             current = self.query_one("#main-content", ContentSwitcher).current
@@ -176,7 +206,23 @@ class ScourApp(App):
         except FileNotFoundError:
             self.notify(f"Reports are at: {path}", severity="information")
 
-    def _do_search(self, query: str) -> None:
+    def _launch_doom(self) -> None:
+        found = False
+        with self.suspend():
+            try:
+                subprocess.run(["doom-ascii"])
+                found = True
+            except FileNotFoundError:
+                try:
+                    subprocess.run(["open-doom"])
+                    found = True
+                except FileNotFoundError:
+                    pass
+        if not found:
+            self.notify("Doom not found — install doom-ascii to play", severity="warning")
+        self.query_one("#command-bar", Input).focus()
+
+    def _do_search(self, query: str, top_n: int = 5) -> None:
         async def _search_worker() -> None:
             loading = self.query_one(LoadingView)
             self._switch_to("loading")
@@ -187,7 +233,7 @@ class ScourApp(App):
                 loading.set_status(msg)
 
             try:
-                report = await run_search(query, on_status)
+                report = await run_search(query, on_status, top_n=top_n)
                 loading.stop_timer()
                 results_view = self.query_one(ResultsView)
                 results_view.show_report(report)

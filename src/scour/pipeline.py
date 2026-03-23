@@ -8,7 +8,7 @@ from scour.utils import save_report
 _URL_PATTERN = re.compile(r'https?://\S+')
 
 
-async def run_search(query: str, on_status: Callable[[str], None]) -> FullReport:
+async def run_search(query: str, on_status: Callable[[str], None], *, top_n: int = 5) -> FullReport:
     # Extract URLs from query and build a cleaner search query
     urls_in_query = _URL_PATTERN.findall(query)
     search_query = _URL_PATTERN.sub('', query).strip()
@@ -18,7 +18,7 @@ async def run_search(query: str, on_status: Callable[[str], None]) -> FullReport
     results = await serper.search(search_query)
 
     on_status(f"Ranking {len(results)} results...")
-    ranked = await gemini.rank_results(query, results, has_urls=bool(urls_in_query))
+    ranked = await gemini.rank_results(query, results, has_urls=bool(urls_in_query), top_n=top_n)
 
     # Add any URLs from the original query as guaranteed extraction targets
     ranked_urls = {r.url for r in ranked}

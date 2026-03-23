@@ -23,8 +23,14 @@ def _truncate(text: str, max_words: int = MAX_WORDS_PER_PAGE) -> str:
     return " ".join(words[:max_words])
 
 
-def _build_markdown(query: str, analyses: list[CompetitorAnalysis], edge: CompetitiveEdge | None = None) -> str:
+def _build_markdown(query: str, analyses: list[CompetitorAnalysis], edge: CompetitiveEdge | None = None, suggested_queries: list[str] | None = None, bottom_line: str = "", positioning: str = "") -> str:
     lines = [f"# Competitive Analysis: {query}\n"]
+
+    if bottom_line:
+        lines.append("## Bottom Line\n")
+        lines.append(f"{bottom_line}\n")
+        if positioning:
+            lines.append(f"> *{positioning}*\n")
 
     if edge:
         lines.append("## Competitive Edge\n")
@@ -61,6 +67,17 @@ def _build_markdown(query: str, analyses: list[CompetitorAnalysis], edge: Compet
             for w in a.weaknesses:
                 lines.append(f"- {w}")
             lines.append("")
+
+    if len(analyses) <= 2:
+        lines.append("---\n")
+        lines.append("> *Looks like you're in a niche market — the field is wide open. Take control!*\n")
+
+    if suggested_queries:
+        lines.append("---\n")
+        lines.append("## Dig Deeper\n")
+        for sq in suggested_queries:
+            lines.append(f"- `/search {sq}`")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -111,7 +128,7 @@ async def _call_gemini(api_key: str, prompt: str) -> str:
         raise PipelineError("gemini", f"Unexpected response structure: {e}")
 
 
-async def rank_results(query: str, results: list[SearchResult], *, has_urls: bool = False) -> list[RankedResult]:
+async def rank_results(query: str, results: list[SearchResult], *, has_urls: bool = False, top_n: int = 5) -> list[RankedResult]:
     try:
         api_key = get_env("GEMINI_API_KEY")
     except RuntimeError as e:
@@ -138,11 +155,11 @@ Prioritize early-stage startups, small companies, and indie products — these a
 Here are search results:
 {results_text}
 
-Pick the 3-5 results most useful for competitive research. Strongly prefer direct startup/company/product pages. For each, explain why it's relevant as a business competitor.
+Pick up to {top_n} results most useful for competitive research — only include genuinely relevant ones. Strongly prefer direct startup/company/product pages. For each, explain why it's relevant as a business competitor.
 
 Exclude: academic journals, PubMed/NIH studies, Wikipedia, research papers, clinical trials, and news articles unless they profile a specific company.
 
-If fewer than 3 strong matches exist, include the best available — never return fewer than 2 results.
+Only include results that are genuinely relevant — never pad with weak matches. Return at least 2 results if possible.
 
 Return JSON in this exact format:
 {{
@@ -211,6 +228,12 @@ After analyzing individual competitors, produce a "competitive_edge" section tha
 - pitfalls_to_avoid: the 3-5 patterns that are clearly hurting competitors or limiting their growth
 - gaps: 2-3 unmet needs or market positions that none of them address well — opportunities for a new startup to own
 
+Finally, suggest 2-3 follow-up search queries that would help the user dig deeper — different angles, narrower niches, or adjacent markets worth exploring.
+
+After all analysis, write:
+- "bottom_line": A 2-3 sentence executive summary that answers: given this landscape, what's the single most important insight and what should the founder do first?
+- "positioning": A single opinionated sentence starting with "A winning position would be:" that commits to a specific market angle.
+
 {pages_text}
 
 Return JSON in this exact format:
@@ -228,7 +251,10 @@ Return JSON in this exact format:
     "ideas_to_steal": ["actionable idea 1", "actionable idea 2"],
     "pitfalls_to_avoid": ["specific pitfall 1", "specific pitfall 2"],
     "gaps": ["market gap 1", "market gap 2"]
-  }}
+  }},
+  "suggested_queries": ["follow-up query 1", "follow-up query 2"],
+  "bottom_line": "2-3 sentence executive summary",
+  "positioning": "A winning position would be: ..."
 }}"""
 
     raw = await _call_gemini(api_key, prompt)
@@ -251,7 +277,10 @@ Return JSON in this exact format:
             pitfalls_to_avoid=edge_data.get("pitfalls_to_avoid", []),
             gaps=edge_data.get("gaps", []),
         )
-        markdown = _build_markdown(query, analyses, edge)
-        return FullReport(query=query, analyses=analyses, edge=edge, markdown=markdown)
+        suggested_queries = data.get("suggested_queries", [])
+        bottom_line = data.get("bottom_line", "")
+        positioning = data.get("positioning", "")
+        markdown = _build_markdown(query, analyses, edge, suggested_queries, bottom_line, positioning)
+        return FullReport(query=query, analyses=analyses, edge=edge, suggested_queries=suggested_queries, bottom_line=bottom_line, positioning=positioning, markdown=markdown)
     except (json.JSONDecodeError, KeyError) as e:
         raise PipelineError("analyze", f"Failed to parse Gemini response: {e}")
