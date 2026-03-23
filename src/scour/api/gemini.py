@@ -148,16 +148,19 @@ async def rank_results(query: str, results: list[SearchResult], *, has_urls: boo
 
     prompt = f"""You are helping with competitive research for: "{query}"
 
-This tool is for BUSINESS competitive analysis — finding companies, startups, products, and services in a market. It is NOT for academic or scientific research.
+This tool is for BUSINESS competitive analysis — finding the ACTUAL COMPANIES, startups, products, and services in a market. The user wants to visit each competitor's own website directly.
 
-Prioritize early-stage startups, small companies, and indie products — these are the most relevant competitors for someone using this tool. Large enterprises are fine to include but should not crowd out smaller players.
+CRITICAL RULES:
+1. ONLY return URLs that are a company/startup/product's OWN website (e.g. notion.so, linear.app, airtable.com). These are direct homepages, pricing pages, or product pages belonging to the company itself.
+2. NEVER return listicle or aggregator pages — this includes sites like G2, Capterra, TechCrunch roundups, "Top 10 X tools" blog posts, ProductHunt collection pages, Crunchbase lists, Medium articles, or any page that lists/reviews multiple products. The user wants to research each competitor directly, not read someone else's summary.
+3. Prioritize early-stage startups, small companies, and indie products. Large enterprises are fine but should not crowd out smaller players.
 {business_hint}
 Here are search results:
 {results_text}
 
-Pick up to {top_n} results most useful for competitive research — only include genuinely relevant ones. Strongly prefer direct startup/company/product pages. For each, explain why it's relevant as a business competitor.
+Pick up to {top_n} results — each MUST be a direct link to a company/product's own website. For each, explain why it's a relevant competitor.
 
-Exclude: academic journals, PubMed/NIH studies, Wikipedia, research papers, clinical trials, and news articles unless they profile a specific company.
+Exclude: listicles, aggregator sites (G2, Capterra, AlternativeTo, etc.), academic journals, Wikipedia, news roundups, blog posts listing multiple tools, and any URL that is NOT the company's own domain.
 
 Only include results that are genuinely relevant — never pad with weak matches. Return at least 2 results if possible.
 

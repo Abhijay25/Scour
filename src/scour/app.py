@@ -65,6 +65,13 @@ class ScourApp(App):
         if current != view_id:
             self._nav_stack.append(current)
         switcher.current = view_id
+        command_bar = self.query_one("#command-bar", Input)
+        if view_id == "preview":
+            command_bar.display = False
+            self.query_one("#preview-scroll").focus()
+        else:
+            command_bar.display = True
+            command_bar.focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         raw = event.value.strip()
@@ -162,6 +169,10 @@ class ScourApp(App):
                 else:
                     target = "welcome"
                 self.query_one("#main-content", ContentSwitcher).current = target
+                # Restore command bar if leaving preview
+                if current == "preview":
+                    command_bar = self.query_one("#command-bar", Input)
+                    command_bar.display = True
             input_widget.focus()
         elif event.key == "shift+tab":
             current = self.query_one("#main-content", ContentSwitcher).current
@@ -207,19 +218,16 @@ class ScourApp(App):
             self.notify(f"Reports are at: {path}", severity="information")
 
     def _launch_doom(self) -> None:
-        found = False
+        from scour.doom import run_doom, _is_built, _supports_kitty_graphics
+
+        if _supports_kitty_graphics() and not _is_built():
+            self.notify("Building terminal-doom (one-time setup)...", severity="information", timeout=10)
+
+        def _on_status(msg: str) -> None:
+            self.notify(msg, severity="information", timeout=8)
+
         with self.suspend():
-            try:
-                subprocess.run(["doom-ascii"])
-                found = True
-            except FileNotFoundError:
-                try:
-                    subprocess.run(["open-doom"])
-                    found = True
-                except FileNotFoundError:
-                    pass
-        if not found:
-            self.notify("Doom not found — install doom-ascii to play", severity="warning")
+            run_doom(on_status=_on_status)
         self.query_one("#command-bar", Input).focus()
 
     def _do_search(self, query: str, top_n: int = 5) -> None:

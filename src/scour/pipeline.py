@@ -12,10 +12,10 @@ async def run_search(query: str, on_status: Callable[[str], None], *, top_n: int
     # Extract URLs from query and build a cleaner search query
     urls_in_query = _URL_PATTERN.findall(query)
     search_query = _URL_PATTERN.sub('', query).strip()
-    search_query = f"{search_query} competitors alternatives"
+    search_query = f"{search_query} startup company product site"
 
     on_status("Searching the web...")
-    results = await serper.search(search_query)
+    results = await serper.search(search_query, num=20)
 
     on_status(f"Ranking {len(results)} results...")
     ranked = await gemini.rank_results(query, results, has_urls=bool(urls_in_query), top_n=top_n)

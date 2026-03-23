@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.widget import Widget
 from textual.widgets import Label, Markdown
 
@@ -21,8 +21,10 @@ class ReportPreview(Widget):
         border-bottom: solid $panel;
         height: auto;
     }
-    ReportPreview Markdown {
+    ReportPreview #preview-scroll {
         height: 1fr;
+    }
+    ReportPreview Markdown {
         padding: 1 2;
     }
     """
@@ -33,7 +35,8 @@ class ReportPreview(Widget):
 
     def compose(self) -> ComposeResult:
         yield Label("Escape to go back  |  /rerun to search again", id="preview-hint")
-        yield Markdown("", id="markdown-content")
+        with VerticalScroll(id="preview-scroll"):
+            yield Markdown("", id="markdown-content")
 
     def show_report(self, path: Path) -> None:
         try:

@@ -23,7 +23,7 @@ class BottomLineBlock(Widget):
         self.positioning = positioning
 
     def compose(self) -> ComposeResult:
-        lines = ["[bold $accent]Bottom Line[/bold $accent]\n"]
+        lines = ["[bold cyan]Bottom Line[/bold cyan]\n"]
         lines.append(self.bottom_line)
         if self.positioning:
             lines.append(f"\n[italic]{self.positioning}[/italic]")
@@ -47,7 +47,7 @@ class CompetitiveEdgeBlock(Widget):
 
     def compose(self) -> ComposeResult:
         e = self.edge
-        lines = ["[bold $accent]Competitive Edge[/bold $accent]"]
+        lines = ["[bold cyan]Competitive Edge[/bold cyan]"]
         if e.ideas_to_steal:
             lines.append("\n[bold green]✅  Ideas to steal[/bold green]")
             for idea in e.ideas_to_steal:
@@ -81,7 +81,7 @@ class CompetitorBlock(Widget):
     def compose(self) -> ComposeResult:
         a = self.analysis
         lines = [
-            f"[bold $accent]{a.title}[/bold $accent]",
+            f"[bold cyan]{a.title}[/bold cyan]",
             f"[italic dim]{a.url}[/italic dim]",
             f"\n{a.summary}",
         ]
@@ -166,11 +166,11 @@ class ResultsView(Widget):
             niche_msg.styles.width = "100%"
             scroll.mount(niche_msg, before=saved)
         if report.suggested_queries:
-            lines = ["[bold $accent]Dig Deeper[/bold $accent]\n"]
+            lines = ["[bold cyan]Dig Deeper[/bold cyan]\n"]
             for sq in report.suggested_queries:
                 lines.append(f"  [cyan]/search {sq}[/cyan]")
             dig_deeper = Static("\n".join(lines), markup=True, classes="dig-deeper")
-            dig_deeper.styles.border = ("round", "$panel")
+            dig_deeper.styles.border = ("round", "grey")
             dig_deeper.styles.padding = (1, 2)
             dig_deeper.styles.margin = (0, 0, 1, 0)
             dig_deeper.styles.width = "100%"
