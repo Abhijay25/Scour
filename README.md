@@ -1,6 +1,6 @@
 # Scour
 
-Scour is a terminal tool for competitive and market research. Give it a plain-English query and it searches the web, visits the most relevant pages, and comes back with a structured analysis — strengths, weaknesses, and a written report saved to your machine.
+Scour is a terminal tool for competitive and market research. Give it a plain-English query and it searches the web, visits each competitor's actual website, and comes back with a structured analysis — strengths, weaknesses, market positioning, and an executive summary saved to your machine.
 
 It's built for anyone who needs to quickly understand a market, find competitors, or research a space — without opening a dozen browser tabs.
 
@@ -14,7 +14,17 @@ You type a query like:
 /search SaaS tools for AI-assisted grading for teachers
 ```
 
-And Scour returns a breakdown of the top competitors — what they do well, where they fall short, and how they compare. Reports are saved as Markdown files you can open any time.
+And Scour returns:
+
+- **Bottom Line** — a 2-3 sentence executive summary with the single most important insight
+- **Positioning Statement** — an opinionated one-liner on where to compete
+- **Competitive Edge** — ideas to steal, pitfalls to avoid, and market gaps
+- **Per-competitor breakdowns** — strengths, weaknesses, business model, and traction signals for each competitor
+- **Dig Deeper** — follow-up queries to explore adjacent angles
+
+Results link directly to each competitor's own website — no listicle aggregators or "Top 10" roundup pages.
+
+Reports are saved as Markdown files you can open any time.
 
 ---
 
@@ -94,19 +104,28 @@ Once inside, type commands into the bar at the bottom of the screen:
 
 | Command | What it does |
 |---|---|
-| `/search <your query>` | Run a research search |
+| `/search <query>` | Run a competitive research search |
+| `/search -n <count> <query>` | Control the number of results (2-15, default 5) |
 | `/history` | Browse your saved reports |
+| `/copy` | Copy the current report's markdown to clipboard |
+| `/open` | Open the reports folder in your file manager |
+| `/rerun` | Re-run the search for a previewed report |
+| `/delete` | Delete the selected report in history view |
+| `/tips` | Tips for writing better queries |
 | `/help` | Show the help screen |
 | `/clear` | Return to the home screen |
 | `/quit` | Exit |
 
 **Tips:**
 - Queries don't need quotes — just type naturally
-- The analysis adapts to your intent: UX-focused queries get UX-focused reports, business-focused queries get business-focused reports
+- The analysis adapts to your intent: ask about pricing and get pricing comparisons, ask about UX and get UX insights
+- Include URLs to anchor results: `/search stem cells similar to https://example.com`
+- Stack qualifiers for specificity: `/search bootstrapped B2B SaaS for HR in Europe`
 - Press `Up` / `Down` to cycle through previous commands
 - Press `Escape` to go back
+- Press `Shift+Tab` to jump to the latest results
 
-Reports are saved as Markdown to `~/.local/share/scour/results/` and viewable any time via `/history`.
+Reports are saved as Markdown to `~/.local/share/scour/results/` and viewable any time via `/history`. The history preview is a full-screen scrollable Markdown view — press `Escape` to go back.
 
 ---
 
